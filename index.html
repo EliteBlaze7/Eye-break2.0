@@ -1,0 +1,410 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#09191c">
+<meta name="description" content="A 20-20-60 eye break timer: every 20 minutes, look 20 feet away for 60 seconds.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' fill='%2309191c'/%3E%3Ccircle cx='16' cy='16' r='9' fill='none' stroke='%233cc3c6' stroke-width='3'/%3E%3C/svg%3E">
+<title>20-20-60 Eye Break</title>
+<style>
+:root {
+  --bg: #09191c;
+  --surface: #11292d;
+  --fg: #e4f1ef;
+  --muted: #93b1b3;
+  --track: #1d3a3e;
+  --work: #3cc3c6;
+  --rest: #f0a24a;
+  --on-accent: #06181a;
+  --stop: #e9806f;
+  --font: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --phase: var(--work);
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html, body { height: 100%; margin: 0; }
+body {
+  background: var(--bg);
+  color: var(--fg);
+  font-family: var(--font);
+  -webkit-tap-highlight-color: transparent;
+  user-select: none;
+  -webkit-user-select: none;
+  overflow: hidden;
+}
+.app {
+  --phase: var(--work);
+  height: 100%;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 16px;
+  padding: max(18px, env(safe-area-inset-top, 0px)) max(20px, env(safe-area-inset-right, 0px)) max(22px, env(safe-area-inset-bottom, 0px)) max(20px, env(safe-area-inset-left, 0px));
+  background: radial-gradient(120% 70% at 50% 38%, color-mix(in srgb, var(--phase) 16%, var(--bg)) 0%, var(--bg) 70%);
+  transition: background 0.4s;
+}
+.app[data-phase="rest"] { --phase: var(--rest); }
+
+.top { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+.title { font-weight: 700; font-size: 1.3rem; letter-spacing: -0.01em; }
+.sub { color: var(--muted); font-size: 0.88rem; line-height: 1.4; margin-top: 4px; max-width: 28ch; }
+.icon-btn {
+  flex: none; width: 46px; height: 46px; border-radius: 12px; border: 0;
+  background: var(--surface); color: var(--fg); cursor: pointer; display: grid; place-items: center;
+}
+.icon-btn:focus-visible, .main:focus-visible { outline: 3px solid var(--fg); outline-offset: 3px; }
+.icon-btn svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+
+.stage { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 20px; flex: 1; min-height: 0; }
+.ring-wrap { position: relative; width: min(84vw, 46vh, 380px); aspect-ratio: 1; }
+svg.ring { width: 100%; height: 100%; transform: rotate(-90deg); display: block; }
+.ring circle { fill: none; stroke-width: 12; }
+.ring .track { stroke: var(--track); }
+.ring .bar { stroke: var(--phase); stroke-linecap: round; transition: stroke 0.4s; }
+.readout { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; }
+.phase { font-size: 0.82rem; font-weight: 700; letter-spacing: 0.16em; text-transform: uppercase; color: var(--phase); }
+.time { font-weight: 600; font-size: clamp(3rem, 18vw, 4.6rem); font-variant-numeric: tabular-nums; letter-spacing: -0.02em; line-height: 1; }
+.message { text-align: center; font-size: 1.1rem; line-height: 1.45; max-width: 28ch; min-height: 3.2em; text-wrap: balance; margin: 0; }
+
+.bottom { display: flex; flex-direction: column; gap: 14px; }
+.facts { display: flex; gap: 12px; }
+.fact { flex: 1; min-width: 0; background: var(--surface); border-radius: 12px; padding: 11px 14px; display: flex; flex-direction: column; gap: 2px; }
+.fact .k { font-size: 0.72rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+.fact .v { font-weight: 600; font-size: 1.05rem; font-variant-numeric: tabular-nums; }
+.main {
+  font: inherit; font-weight: 700; font-size: 1.2rem; min-height: 62px; width: 100%;
+  border: 0; border-radius: 16px; cursor: pointer; background: var(--work); color: var(--on-accent);
+}
+.main.stop { background: transparent; color: var(--stop); box-shadow: inset 0 0 0 2px var(--stop); }
+.main:active { transform: scale(0.99); }
+.status { color: var(--muted); font-size: 0.8rem; line-height: 1.45; margin: 0; text-align: center; }
+[hidden] { display: none !important; }
+@media (prefers-reduced-motion: reduce) { .app, .ring .bar { transition: none; } }
+</style>
+</head>
+<body>
+<main class="app" id="app" data-phase="work">
+  <div class="top">
+    <div>
+      <div class="title">20-20-60</div>
+      <div class="sub">Every 20 minutes, look 20 feet away for 60 seconds.</div>
+    </div>
+    <button class="icon-btn" id="fs" type="button" aria-label="Toggle full screen">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg>
+    </button>
+  </div>
+
+  <section class="stage" aria-live="polite">
+    <div class="ring-wrap">
+      <svg class="ring" viewBox="0 0 240 240" aria-hidden="true">
+        <circle class="track" cx="120" cy="120" r="108"></circle>
+        <circle class="bar" id="bar" cx="120" cy="120" r="108" stroke-dasharray="678.58" stroke-dashoffset="678.58"></circle>
+      </svg>
+      <div class="readout">
+        <div class="phase" id="phase">Ready</div>
+        <div class="time" id="time">20:00</div>
+      </div>
+    </div>
+    <p class="message" id="msg">Press Start and keep working. You will be alerted when it is time to look away.</p>
+  </section>
+
+  <section class="bottom">
+    <div class="facts">
+      <div class="fact"><span class="k">Breaks taken</span><span class="v" id="cycles">0</span></div>
+      <div class="fact"><span class="k">Next</span><span class="v" id="next">Break in 20 min</span></div>
+    </div>
+    <button class="main" id="start" type="button">Start</button>
+    <button class="main stop" id="stop" type="button" hidden>Stop</button>
+    <p class="status" id="status"></p>
+  </section>
+</main>
+
+<script>
+(function () {
+  var WORK = 20 * 60 * 1000;
+  var REST = 60 * 1000;
+  var C = 2 * Math.PI * 108;
+  var $ = function (id) { return document.getElementById(id); };
+  var app = $("app"), bar = $("bar"), timeEl = $("time"), phaseEl = $("phase"), msgEl = $("msg");
+  var startBtn = $("start"), stopBtn = $("stop"), cyclesEl = $("cycles"), nextEl = $("next"), statusEl = $("status"), fsBtn = $("fs");
+
+  var state = { running: false, phase: "work", endAt: 0, cycles: 0 };
+  var timer = null, audioCtx = null, wakeLock = null, swReg = null;
+
+  function save() { try { localStorage.setItem("eyebreak", JSON.stringify(state)); } catch (e) {} }
+  function load() {
+    try {
+      var s = JSON.parse(localStorage.getItem("eyebreak") || "null");
+      if (s && s.running && typeof s.endAt === "number") state = s;
+    } catch (e) {}
+  }
+  function fmt(ms) {
+    var s = Math.max(0, Math.ceil(ms / 1000));
+    var m = Math.floor(s / 60), r = s % 60;
+    return (m < 10 ? "0" : "") + m + ":" + (r < 10 ? "0" : "") + r;
+  }
+
+  /* Sound: a clear three-note chime, repeated twice so it is hard to miss. */
+  function chime(rising) {
+    try {
+      if (!audioCtx) return;
+      if (audioCtx.state === "suspended" && audioCtx.resume) audioCtx.resume();
+      var notes = rising ? [659, 784, 988] : [988, 784, 659];
+      var t0 = audioCtx.currentTime + 0.05;
+      for (var round = 0; round < 2; round++) {
+        notes.forEach(function (f, i) {
+          var t = t0 + round * 1.2 + i * 0.3;
+          var o = audioCtx.createOscillator(), g = audioCtx.createGain();
+          o.type = "triangle"; o.frequency.value = f;
+          g.gain.setValueAtTime(0.0001, t);
+          g.gain.exponentialRampToValueAtTime(0.7, t + 0.03);
+          g.gain.exponentialRampToValueAtTime(0.0001, t + 0.5);
+          o.connect(g); g.connect(audioCtx.destination);
+          o.start(t); o.stop(t + 0.55);
+        });
+      }
+    } catch (e) {}
+  }
+
+  function notify(title, body, rising) {
+    playChime(rising);
+    try { if (navigator.vibrate) navigator.vibrate([400, 200, 400, 200, 400]); } catch (e) {}
+    try {
+      if (!("Notification" in window) || Notification.permission !== "granted") return;
+      var opts = { body: body, tag: "eye-break", renotify: true, silent: false, vibrate: [400, 200, 400] };
+      if (swReg && swReg.showNotification) { swReg.showNotification(title, opts); return; }
+      new Notification(title, opts);
+    } catch (e) {
+      try { if (swReg && swReg.showNotification) swReg.showNotification(title, { body: body, tag: "eye-break" }); } catch (e2) {}
+    }
+  }
+
+  function lockScreen() {
+    try {
+      if (navigator.wakeLock && !wakeLock) {
+        navigator.wakeLock.request("screen").then(function (l) {
+          wakeLock = l; l.addEventListener("release", function () { wakeLock = null; });
+        }).catch(function () {});
+      }
+    } catch (e) {}
+  }
+  function unlockScreen() { try { if (wakeLock) { wakeLock.release(); wakeLock = null; } } catch (e) {} }
+
+  /* Background mode: a looping, inaudible sound plus a media notification
+     tells Android this page is playing media, so Chrome keeps it running
+     when you switch to another app. */
+  var keepAudio = null, chimeUp = null, chimeDown = null;
+
+  function wavUrl(samples, rate) {
+    var n = samples.length, buf = new ArrayBuffer(44 + n * 2), v = new DataView(buf);
+    function str(o, s) { for (var i = 0; i < s.length; i++) v.setUint8(o + i, s.charCodeAt(i)); }
+    str(0, "RIFF"); v.setUint32(4, 36 + n * 2, true); str(8, "WAVE"); str(12, "fmt ");
+    v.setUint32(16, 16, true); v.setUint16(20, 1, true); v.setUint16(22, 1, true);
+    v.setUint32(24, rate, true); v.setUint32(28, rate * 2, true); v.setUint16(32, 2, true); v.setUint16(34, 16, true);
+    str(36, "data"); v.setUint32(40, n * 2, true);
+    for (var i = 0; i < n; i++) v.setInt16(44 + i * 2, samples[i], true);
+    return URL.createObjectURL(new Blob([buf], { type: "audio/wav" }));
+  }
+
+  function makeKeepUrl() {
+    var rate = 8000, s = new Array(rate * 2);
+    for (var i = 0; i < s.length; i++) s[i] = (i % 2 ? 1 : -1);
+    return wavUrl(s, rate);
+  }
+
+  function makeChimeUrl(rising) {
+    var rate = 22050, total = Math.floor(rate * 2.7), s = new Array(total);
+    var notes = rising ? [659, 784, 988] : [988, 784, 659];
+    for (var i = 0; i < total; i++) s[i] = 0;
+    for (var round = 0; round < 2; round++) {
+      for (var k = 0; k < 3; k++) {
+        var st = Math.floor((round * 1.2 + k * 0.3) * rate), len = Math.floor(rate * 0.5);
+        for (var j = 0; j < len && st + j < total; j++) {
+          var t = j / rate, env = t < 0.03 ? t / 0.03 : Math.exp(-(t - 0.03) * 7);
+          s[st + j] += 14000 * env * Math.sin(2 * Math.PI * notes[k] * t);
+        }
+      }
+    }
+    for (var m = 0; m < total; m++) s[m] = Math.max(-32000, Math.min(32000, Math.round(s[m])));
+    return wavUrl(s, rate);
+  }
+
+  function playChime(rising) {
+    try {
+      var a = rising ? chimeUp : chimeDown;
+      if (a) {
+        a.currentTime = 0;
+        var p = a.play();
+        if (p && p.catch) p.catch(function () { chime(rising); });
+        return;
+      }
+    } catch (e) {}
+    chime(rising);
+  }
+
+  function setSession() {
+    try {
+      if (!("mediaSession" in navigator) || typeof MediaMetadata === "undefined") return;
+      var working = state.phase === "work";
+      navigator.mediaSession.metadata = new MediaMetadata({
+        title: working ? "Working. Next break in under 20 min" : "Look away for 60 seconds",
+        artist: "20-20-60 Eye Break"
+      });
+      navigator.mediaSession.playbackState = "playing";
+      navigator.mediaSession.setActionHandler("stop", function () { stop(); });
+      navigator.mediaSession.setActionHandler("pause", function () {});
+    } catch (e) {}
+  }
+
+  function startKeepAlive() {
+    try {
+      if (!keepAudio) { keepAudio = new Audio(makeKeepUrl()); keepAudio.loop = true; }
+      if (!chimeUp) { chimeUp = new Audio(makeChimeUrl(true)); chimeDown = new Audio(makeChimeUrl(false)); }
+      var p = keepAudio.play();
+      if (p && p.catch) p.catch(function () {});
+      [chimeUp, chimeDown].forEach(function (a) {
+        a.muted = true;
+        var q = a.play();
+        if (q && q.then) q.then(function () { a.pause(); a.currentTime = 0; a.muted = false; }).catch(function () { a.muted = false; });
+      });
+    } catch (e) {}
+    setSession();
+  }
+
+  function stopKeepAlive() {
+    try { if (keepAudio) keepAudio.pause(); } catch (e) {}
+    try {
+      if ("mediaSession" in navigator) {
+        navigator.mediaSession.playbackState = "none";
+        navigator.mediaSession.metadata = null;
+      }
+    } catch (e) {}
+  }
+
+  function isFull() { return !!(document.fullscreenElement || document.webkitFullscreenElement); }
+  function enterFull() {
+    var el = document.documentElement;
+    try {
+      var p = (el.requestFullscreen && el.requestFullscreen({ navigationUI: "hide" })) ||
+              (el.webkitRequestFullscreen && el.webkitRequestFullscreen());
+      if (p && p.catch) p.catch(function () {});
+    } catch (e) {}
+  }
+  function exitFull() {
+    try {
+      var p = (document.exitFullscreen && document.exitFullscreen()) ||
+              (document.webkitExitFullscreen && document.webkitExitFullscreen());
+      if (p && p.catch) p.catch(function () {});
+    } catch (e) {}
+  }
+
+  function setMessage() {
+    if (!state.running) msgEl.textContent = "Press Start and keep working. You will be alerted when it is time to look away.";
+    else if (state.phase === "rest") msgEl.textContent = "Look at something 20 feet away until the timer ends.";
+    else msgEl.textContent = "Focus on your work. The next break alert is coming.";
+  }
+
+  function render() {
+    var now = Date.now();
+    app.setAttribute("data-phase", state.phase);
+    cyclesEl.textContent = state.cycles;
+    if (!state.running) {
+      phaseEl.textContent = "Ready";
+      timeEl.textContent = fmt(WORK);
+      bar.style.strokeDashoffset = C;
+      nextEl.textContent = "Break in 20 min";
+      startBtn.hidden = false; stopBtn.hidden = true;
+      return;
+    }
+    var dur = state.phase === "work" ? WORK : REST;
+    var left = Math.max(0, state.endAt - now);
+    timeEl.textContent = fmt(left);
+    bar.style.strokeDashoffset = C * (left / dur);
+    phaseEl.textContent = state.phase === "work" ? "Working" : "Look away";
+    nextEl.textContent = state.phase === "work" ? "Break in " + Math.ceil(left / 60000) + " min" : "Work in " + Math.ceil(left / 1000) + " s";
+    startBtn.hidden = true; stopBtn.hidden = false;
+  }
+
+  function tick() {
+    if (!state.running) return;
+    var now = Date.now(), moved = false;
+    while (now >= state.endAt) {
+      if (state.phase === "work") { state.phase = "rest"; state.endAt += REST; }
+      else { state.phase = "work"; state.cycles += 1; state.endAt += WORK; }
+      moved = true;
+    }
+    if (moved) {
+      setMessage(); setSession();
+      if (state.phase === "rest") notify("Time to rest your eyes", "Look at something 20 feet away for 60 seconds.", false);
+      else notify("Break over", "Back to work. Next break in 20 minutes.", true);
+      save();
+    }
+    render();
+  }
+
+  function updateStatus() {
+    var n = ("Notification" in window) ? Notification.permission : "unsupported";
+    var parts = [];
+    if (n === "granted") parts.push("Notifications on");
+    else if (n === "denied") parts.push("Notifications blocked in browser settings");
+    else parts.push("Notifications unavailable here");
+    parts.push("sound and vibration on");
+    statusEl.textContent = parts.join(", ") + ". You can switch to other apps while it runs.";
+  }
+
+  function start() {
+    try {
+      var AC = window.AudioContext || window.webkitAudioContext;
+      if (AC) { audioCtx = audioCtx || new AC(); if (audioCtx.resume) audioCtx.resume(); }
+    } catch (e) {}
+    try {
+      if ("Notification" in window && Notification.permission === "default") {
+        var r = Notification.requestPermission(function (p) { updateStatus(); });
+        if (r && r.then) r.then(updateStatus).catch(function () {});
+      }
+    } catch (e) {}
+    state = { running: true, phase: "work", endAt: Date.now() + WORK, cycles: 0 };
+    enterFull(); lockScreen(); startKeepAlive();
+    save(); setMessage(); render(); updateStatus();
+    clearInterval(timer); timer = setInterval(tick, 250);
+  }
+
+  function stop() {
+    state = { running: false, phase: "work", endAt: 0, cycles: state.cycles };
+    clearInterval(timer); timer = null;
+    unlockScreen(); stopKeepAlive();
+    try { localStorage.removeItem("eyebreak"); } catch (e) {}
+    setMessage(); render();
+  }
+
+  document.addEventListener("visibilitychange", function () {
+    if (!document.hidden && state.running) { lockScreen(); tick(); }
+  });
+  startBtn.addEventListener("click", start);
+  stopBtn.addEventListener("click", stop);
+  fsBtn.addEventListener("click", function () { isFull() ? exitFull() : enterFull(); });
+
+  try {
+    if ("serviceWorker" in navigator && location.protocol.indexOf("http") === 0) {
+      navigator.serviceWorker.register("sw.js")
+        .then(function () { return navigator.serviceWorker.ready; })
+        .then(function (r) { swReg = r; })
+        .catch(function () {});
+    }
+  } catch (e) {}
+
+  load();
+  if (state.running) {
+    timer = setInterval(tick, 250); lockScreen();
+    document.addEventListener("pointerdown", function once() {
+      document.removeEventListener("pointerdown", once);
+      startKeepAlive();
+    });
+  }
+  setMessage(); updateStatus(); render();
+})();
+</script>
+</body>
+</html>
